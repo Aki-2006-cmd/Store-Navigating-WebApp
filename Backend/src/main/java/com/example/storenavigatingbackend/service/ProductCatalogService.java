@@ -40,7 +40,7 @@ public class ProductCatalogService {
     }
 
     public List<Product> getActiveDeals() {
-        return productRepository.findByOfferFractionGreaterThan(0.000);[cite: 5]
+        return productRepository.findByOfferFractionGreaterThan(0.000);
     }
 
     public Map<String, Object> calculateCartSummary(List<CartItemRequest> cartItems) {
@@ -52,7 +52,7 @@ public class ProductCatalogService {
             Product product = productRepository.findById(item.getProductId())
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + item.getProductId()));
 
-            BigDecimal originalPrice = product.getPrice();[cite: 5]
+            BigDecimal originalPrice = product.getPrice();
             BigDecimal effectivePrice = product.getEffectivePrice();
             int quantity = item.getQuantity();
 
@@ -64,11 +64,11 @@ public class ProductCatalogService {
             totalSavings = totalSavings.add(lineDiscount);
 
             Map<String, Object> itemDetail = new HashMap<>();
-            itemDetail.put("id", product.getId());[cite: 5]
-            itemDetail.put("productName", product.getProductName());[cite: 5]
-            itemDetail.put("brand", product.getBrand());[cite: 5]
-            itemDetail.put("category", product.getProductCategory());[cite: 5]
-            itemDetail.put("aisle", product.getProductIsle());[cite: 5]
+            itemDetail.put("id", product.getId());
+            itemDetail.put("productName", product.getProductName());
+            itemDetail.put("brand", product.getBrand());
+            itemDetail.put("category", product.getProductCategory());
+            itemDetail.put("aisle", product.getProductIsle());
             itemDetail.put("originalPrice", originalPrice);
             itemDetail.put("effectivePrice", effectivePrice);
             itemDetail.put("quantity", quantity);

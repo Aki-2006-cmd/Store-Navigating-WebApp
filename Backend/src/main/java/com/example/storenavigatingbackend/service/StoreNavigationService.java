@@ -18,14 +18,15 @@ public class StoreNavigationService {
         this.routeSolverService = routeSolverService;
     }
 
+
     public GridPoint mapProductToCoordinate(Product product) {
-        if (product.getProductIsle() != null) {[cite: 5]
-            int aisle = product.getProductIsle();[cite: 5]
+        if (product.getProductIsle() != null) {
+            int aisle = product.getProductIsle();
             int xCoord = Math.min(Math.max(aisle * 2, 1), 22);
             return new GridPoint(xCoord, 5);
         }
 
-        String category = product.getProductCategory() != null ? product.getProductCategory().toLowerCase() : "";[cite: 5]
+        String category = product.getProductCategory() != null ? product.getProductCategory().toLowerCase() : "";
         return switch (category) {
             case "dairy" -> new GridPoint(2, 9);
             case "cooking ingredients" -> new GridPoint(6, 5);
@@ -45,8 +46,8 @@ public class StoreNavigationService {
             itemWaypoints.add(mapProductToCoordinate(product));
         }
 
-        GridPoint startPoint = new GridPoint(2, 0);   // Entrance/Carts (y=0)[cite: 1, 3]
-        GridPoint checkoutPoint = new GridPoint(18, 0); // Checkout (y=0)[cite: 1, 3]
+        GridPoint startPoint = new GridPoint(2, 0);
+        GridPoint checkoutPoint = new GridPoint(18, 0);
 
         return routeSolverService.generateCompleteStoreRoute(startPoint, itemWaypoints, checkoutPoint);
     }

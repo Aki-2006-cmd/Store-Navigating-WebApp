@@ -9,8 +9,8 @@ import java.util.*;
 @Service
 public class RouteSolverService {
 
-    private static final int MAX_X = 23;[cite: 1]
-    private static final int MAX_Y = 10;[cite: 1]
+    private static final int MAX_X = 23;
+    private static final int MAX_Y = 10;
     private final Set<GridPoint> obstacles = new HashSet<>();
 
     public RouteSolverService() {
