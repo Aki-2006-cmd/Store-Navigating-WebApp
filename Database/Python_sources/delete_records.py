@@ -8,6 +8,8 @@ def del_records():
     del_id=input("Enter ids to delete seperated by \",\" or to delete all enetr \"all\" : ")
     if del_id=="all":
         cursor.execute('''DELETE FROM main_table''')
+        db.commit()
+        cursor.execute('''UPDATE sqlite_sequence SET seq = 1 WHERE name = id''')
     else:
         del_id=list(map(int, del_id.split(",")))
         for record_id in del_id:
