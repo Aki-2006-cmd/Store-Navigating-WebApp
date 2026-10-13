@@ -38,7 +38,7 @@ public class StoreNavigationService {
         };
     }
 
-    public List<GridPoint> calculateCartNavigationRoute(List<String> productIds) {
+    public List<GridPoint> calculateCartNavigationRoute(List<Long> productIds) {
         List<Product> products = productRepository.findAllById(productIds);
 
         List<GridPoint> itemWaypoints = new ArrayList<>();

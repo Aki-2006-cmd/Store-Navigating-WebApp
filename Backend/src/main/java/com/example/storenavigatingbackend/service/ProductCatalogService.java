@@ -20,7 +20,7 @@ public class ProductCatalogService {
         return productRepository.findAll();
     }
 
-    public Optional<Product> getProductById(String id) {
+    public Optional<Product> getProductById(Long id) {
         return productRepository.findById(id);
     }
 
@@ -49,7 +49,7 @@ public class ProductCatalogService {
         List<Map<String, Object>> processedItems = new ArrayList<>();
 
         for (CartItemRequest item : cartItems) {
-            Product product = productRepository.findById(item.getProductId())
+            Product product = productRepository.findById(Long.valueOf(item.getProductId()))
                     .orElseThrow(() -> new IllegalArgumentException("Product not found: " + item.getProductId()));
 
             BigDecimal originalPrice = product.getPrice();

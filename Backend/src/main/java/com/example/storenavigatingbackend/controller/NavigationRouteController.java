@@ -27,7 +27,7 @@ public class NavigationRouteController {
 
     // "Find the location of a product" — single-item lookup
     @GetMapping("/locate/{productId}")
-    public ResponseEntity<GridPoint> locateProduct(@PathVariable String productId) {
+    public ResponseEntity<GridPoint> locateProduct(@PathVariable Long productId) {
         Optional<Product> product = productCatalogService.getProductById(productId);
         return product
                 .map(storeNavigationService::mapProductToCoordinate)
@@ -37,7 +37,7 @@ public class NavigationRouteController {
 
     // "Given a grocery list, generate the shortest-time route" — full cart route
     @PostMapping("/route")
-    public ResponseEntity<List<GridPoint>> generateShoppingRoute(@RequestBody List<String> productIds) {
+    public ResponseEntity<List<GridPoint>> generateShoppingRoute(@RequestBody List<Long> productIds) {
         if (productIds == null || productIds.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
