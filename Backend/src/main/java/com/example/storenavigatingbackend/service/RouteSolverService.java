@@ -64,30 +64,22 @@ public class RouteSolverService {
     }
 
     public List<GridPoint> generateCompleteStoreRoute(GridPoint start, List<GridPoint> itemLocations, GridPoint checkout) {
-        List<GridPoint> unvisited = new ArrayList<>(itemLocations);
+        if (itemLocations == null || itemLocations.isEmpty()) {
+            return findPathBetweenPoints(start, checkout);
+        }
+
+        // Optimize stop sequence using TSP (Nearest Neighbor + 2-Opt local search refinement)
+        List<GridPoint> orderedStops = optimizeTspTour(start, itemLocations);
         List<GridPoint> completeRoute = new ArrayList<>();
         GridPoint currentPoint = start;
 
-        while (!unvisited.isEmpty()) {
-            GridPoint nearest = null;
-            double minDistance = Double.MAX_VALUE;
-
-            for (GridPoint item : unvisited) {
-                double dist = calculateHeuristic(currentPoint, item);
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    nearest = item;
-                }
-            }
-
-            List<GridPoint> legPath = findPathBetweenPoints(currentPoint, nearest);
+        for (GridPoint nextStop : orderedStops) {
+            List<GridPoint> legPath = findPathBetweenPoints(currentPoint, nextStop);
             if (!completeRoute.isEmpty() && !legPath.isEmpty()) {
-                legPath.remove(0);
+                legPath.remove(0); // Avoid duplicating the connection node
             }
             completeRoute.addAll(legPath);
-
-            currentPoint = nearest;
-            unvisited.remove(nearest);
+            currentPoint = nextStop;
         }
 
         List<GridPoint> finalLeg = findPathBetweenPoints(currentPoint, checkout);
@@ -97,6 +89,72 @@ public class RouteSolverService {
         completeRoute.addAll(finalLeg);
 
         return completeRoute;
+    }
+
+    private List<GridPoint> optimizeTspTour(GridPoint start, List<GridPoint> locations) {
+        // Step 1: Initial Nearest Neighbor tour generation
+        List<GridPoint> tour = new ArrayList<>();
+        List<GridPoint> unvisited = new ArrayList<>(locations);
+        GridPoint current = start;
+
+        while (!unvisited.isEmpty()) {
+            GridPoint nearest = null;
+            double minDist = Double.MAX_VALUE;
+
+            for (GridPoint pt : unvisited) {
+                double dist = calculateHeuristic(current, pt);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = pt;
+                }
+            }
+            tour.add(nearest);
+            current = nearest;
+            unvisited.remove(nearest);
+        }
+
+        // Step 2: 2-opt optimization pass to remove unnecessary crisscrossing
+        boolean improvement = true;
+        int maxIterations = 50;
+        int iteration = 0;
+
+        while (improvement && iteration < maxIterations) {
+            improvement = false;
+            iteration++;
+
+            for (int i = 0; i < tour.size() - 1; i++) {
+                for (int j = i + 1; j < tour.size(); j++) {
+                    List<GridPoint> newTour = reverseTourSegment(tour, i, j);
+                    if (calculateTourCost(start, newTour) < calculateTourCost(start, tour)) {
+                        tour = newTour;
+                        improvement = true;
+                    }
+                }
+            }
+        }
+
+        return tour;
+    }
+
+    private List<GridPoint> reverseTourSegment(List<GridPoint> tour, int i, int j) {
+        List<GridPoint> modified = new ArrayList<>(tour);
+        while (i < j) {
+            GridPoint temp = modified.get(i);
+            modified.set(i, modified.get(j));
+            modified.set(j, temp);
+            i++;
+            j--;
+        }
+        return modified;
+    }
+
+    private double calculateTourCost(GridPoint start, List<GridPoint> tour) {
+        if (tour.isEmpty()) return 0;
+        double cost = calculateHeuristic(start, tour.get(0));
+        for (int i = 0; i < tour.size() - 1; i++) {
+            cost += calculateHeuristic(tour.get(i), tour.get(i + 1));
+        }
+        return cost;
     }
 
     private double calculateHeuristic(GridPoint p1, GridPoint p2) {
