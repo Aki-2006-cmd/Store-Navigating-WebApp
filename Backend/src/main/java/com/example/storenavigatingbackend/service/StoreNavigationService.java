@@ -18,24 +18,43 @@ public class StoreNavigationService {
         this.routeSolverService = routeSolverService;
     }
 
-
     public GridPoint mapProductToCoordinate(Product product) {
-        if (product.getProductIsle() != null) {
-            int aisle = product.getProductIsle();
-            int xCoord = Math.min(Math.max(aisle * 2, 1), 22);
-            return new GridPoint(xCoord, 5);
+        int dbX = product.getXCoordinate();
+        int dbY = product.getYCoordinate();
+
+        String productName = product.getProductName() != null ? product.getProductName().toLowerCase() : "";
+
+        // Specific override for products located at the very top/end of Aisle 1 (like Soy Milk)
+        if (productName.contains("soy milk")) {
+            return new GridPoint(3, 7); // Top end of Aisle 1 walkway
         }
 
-        String category = product.getProductCategory() != null ? product.getProductCategory().toLowerCase() : "";
-        return switch (category) {
-            case "dairy" -> new GridPoint(2, 9);
-            case "cooking ingredients" -> new GridPoint(6, 5);
-            case "baking", "flour & baking" -> new GridPoint(10, 5);
-            case "meat" -> new GridPoint(16, 9);
-            case "seafood" -> new GridPoint(20, 9);
-            case "snacks" -> new GridPoint(22, 3);
-            default -> new GridPoint(12, 5);
-        };
+        int gridY = Math.max(1, Math.min(8, dbY));
+        int gridX = Math.max(2, Math.min(21, dbX));
+
+        if (isShelfObstacle(gridX, gridY)) {
+            gridX = getAdjacentWalkwayColumn(gridX);
+        }
+
+        return new GridPoint(gridX, gridY);
+    }
+
+    private boolean isShelfObstacle(int x, int y) {
+        if (y < 2 || y > 7) return false;
+        int[] shelfXColumns = {4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20};
+        for (int sx : shelfXColumns) {
+            if (sx == x) return true;
+        }
+        return false;
+    }
+
+    private int getAdjacentWalkwayColumn(int shelfX) {
+        if (shelfX <= 5) return 3;   // Aisle 1
+        if (shelfX <= 8) return 6;   // Aisle 2
+        if (shelfX <= 11) return 9;  // Aisle 3
+        if (shelfX <= 14) return 12; // Aisle 4
+        if (shelfX <= 17) return 15; // Aisle 5
+        return 18;                   // Aisle 6
     }
 
     public List<GridPoint> calculateCartNavigationRoute(List<Long> productIds) {
@@ -46,7 +65,9 @@ public class StoreNavigationService {
             itemWaypoints.add(mapProductToCoordinate(product));
         }
 
-        GridPoint startPoint = new GridPoint(2, 0);
+        // Carts Starting Point at (3, 0)
+        GridPoint startPoint = new GridPoint(3, 0);
+        // Checkout Counters Ending Point at (18, 0)
         GridPoint checkoutPoint = new GridPoint(18, 0);
 
         return routeSolverService.generateCompleteStoreRoute(startPoint, itemWaypoints, checkoutPoint);

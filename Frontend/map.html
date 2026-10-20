@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AISLEWISE - Interactive Supermarket Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --primary: #2bb673;
+      --primary-hover: #23985f;
+      --primary-light: #eefbf4;
+      --bg: #f4f7f5;
+      --card-bg: #ffffff;
+      --text: #2d3748;
+      --border: #e2e8f0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: var(--primary);
+      color: white;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.2rem;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 0.8rem;
+      color: var(--primary);
+      font-weight: 600;
+      background: var(--primary-light);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #f8fafc;
+    }
+
+    main {
+      flex: 1;
+      padding: 1.5rem;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* Layout wrapper containing canvas and sidebar to avoid layout blocking */
+    .map-container {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      width: 100%;
+      max-width: 1300px;
+      margin: 0 auto;
+    }
+
+    .map-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      position: relative;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* Google Maps Style Hover Tooltip Card */
+    #mapTooltip {
+      position: absolute;
+      display: none;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      width: 280px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+      pointer-events: none;
+      z-index: 100;
+      transition: transform 0.1s ease;
+    }
+
+    #mapTooltip h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 0.3rem;
+    }
+
+    .tooltip-product-list {
+      max-height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .tooltip-product-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      background: #f8fafc;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .tooltip-product-item img {
+      width: 32px;
+      height: 32px;
+      object-fit: cover;
+      border-radius: 4px;
+      background: #e2e8f0;
+    }
+
+    /* Sidebar panel for QR Code to keep the map clean and unobstructed */
+    .map-sidebar {
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+
+    .qr-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .qr-box h4 {
+      font-size: 0.9rem;
+      color: var(--text);
+      font-weight: 600;
+      text-align: center;
+    }
+
+    #qrcode {
+      padding: 6px;
+      background: white;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .status-banner {
+      width: 100%;
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--primary-light);
+      color: var(--primary-hover);
+      border: 1px solid rgba(43, 182, 115, 0.2);
+    }
+
+    .route-info-badge {
+      font-weight: 600;
+    }
+
+    .qr-btn-full {
+      font-size: 0.85rem;
+      padding: 0.5rem 0.8rem;
+      width: 100%;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="index.html" class="brand">
+      <div class="brand-logo">A</div>
+      <div class="brand-title">AISLEWISE <span class="brand-subtitle">Interactive Map</span></div>
+    </a>
+    <div class="header-actions">
+      <a href="index.html" class="btn btn-secondary">&larr; Back to Store</a>
+      <button id="downloadBtn" class="btn" type="button">Download Blueprint (PNG)</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="statusBanner" class="status-banner">
+      <span id="statusText">Hover over any aisle to inspect exact product locations...</span>
+      <span id="routeInfo" class="route-info-badge"></span>
+    </div>
+
+    <div class="map-container">
+      <div class="map-card">
+        <div class="canvas-container" id="canvasContainer">
+          <canvas id="mapCanvas" width="1200" height="750"></canvas>
+          <!-- Google Maps Style Hover Tooltip -->
+          <div id="mapTooltip">
+            <h3 id="tooltipTitle">Aisle Info</h3>
+            <div class="tooltip-product-list" id="tooltipProducts"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Panel hosting the QR Code -->
+      <div class="map-sidebar">
+        <div class="qr-box">
+          <h4>Scan for Mobile Navigation</h4>
+          <div id="qrcode"></div>
+          <button id="qrDownloadBtn" class="btn btn-secondary qr-btn-full" type="button">
+            Save Image
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const API_ROUTE_URL = "http://localhost:8080/api/navigation/route";
+    const API_PRODUCTS_URL = "http://localhost:8080/api/products"; // Endpoint returning all products from SQLite DB
+    const GRID_WIDTH = 24;
+    const GRID_HEIGHT = 10;
+
+    const canvas = document.getElementById("mapCanvas");
+    const ctx = canvas.getContext("2d");
+    const statusText = document.getElementById("statusText");
+    const routeInfo = document.getElementById("routeInfo");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const qrDownloadBtn = document.getElementById("qrDownloadBtn");
+    const tooltip = document.getElementById("mapTooltip");
+    const tooltipTitle = document.getElementById("tooltipTitle");
+    const tooltipProducts = document.getElementById("tooltipProducts");
+    const canvasContainer = document.getElementById("canvasContainer");
+
+    let calculatedPath = [];
+    let allDatabaseProducts = [];
+
+    async function initMap() {
+      await fetchAllProducts();
+      await loadRouteData();
+    }
+
+    async function fetchAllProducts() {
+      try {
+        const res = await fetch(API_PRODUCTS_URL);
+        if (res.ok) {
+          allDatabaseProducts = await res.json();
+        }
+      } catch (err) {
+        console.warn("Could not fetch full product database for hover inspection:", err);
+      }
+    }
+
+    async function loadRouteData() {
+      const storedIds = localStorage.getItem("aislewise_cart_ids");
+      let productIds = storedIds ? JSON.parse(storedIds) : [];
+
+      if (!productIds || productIds.length === 0) {
+        statusText.textContent = "No items selected. Hover over aisles to inspect inventory.";
+        calculatedPath = [
+          {x:3, y:1}, {x:3, y:8}, {x:6, y:8}, {x:6, y:1}, {x:18, y:1}
+        ];
+        renderMap();
+        generateQRCode();
+        return;
+      }
+
+      try {
+        statusText.textContent = "Calculating precise database coordinate route for " + productIds.length + " item(s)...";
+        const res = await fetch(API_ROUTE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(productIds)
+        });
+
+        if (!res.ok) throw new Error("Backend response error");
+        const pathData = await res.json();
+
+        if (Array.isArray(pathData) && pathData.length > 0) {
+          calculatedPath = pathData;
+          statusText.textContent = "Precise route loaded successfully!";
+          routeInfo.textContent = pathData.length + " Waypoints";
+        }
+      } catch (err) {
+        console.warn("Using default path:", err);
+        calculatedPath = [
+          {x:3, y:1}, {x:3, y:8}, {x:6, y:8}, {x:6, y:1}, {x:18, y:1}
+        ];
+      }
+
+      renderMap();
+      generateQRCode();
+    }
+
+    const shelfBlocks = [
+      { name: "Aisle 1", category: "Dairy & Milk", x: 4, gridMinX: 4, gridMaxX: 5 },
+      { name: "Aisle 2", category: "Bakery & Buns", x: 7, gridMinX: 7, gridMaxX: 8 },
+      { name: "Aisle 3", category: "Produce & Veg", x: 10, gridMinX: 10, gridMaxX: 11 },
+      { name: "Aisle 4", category: "Snacks & Sweets", x: 13, gridMinX: 13, gridMaxX: 14 },
+      { name: "Aisle 5", category: "Meat & Poultry", x: 16, gridMinX: 16, gridMaxX: 17 },
+      { name: "Aisle 6", category: "Seafood & Fish", x: 19, gridMinX: 19, gridMaxX: 20 }
+    ];
+
+    function renderMap() {
+      const w = canvas.width;
+      const h = canvas.height;
+      const margin = 50;
+      const usableW = w - margin * 2;
+      const usableH = h - margin * 2;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(margin, margin, usableW, usableH);
+
+      const cellW = usableW / GRID_WIDTH;
+      const cellH = usableH / GRID_HEIGHT;
+
+      function toScreenX(gridX) { return margin + gridX * cellW; }
+      function toScreenY(gridY) { return margin + (GRID_HEIGHT - gridY - 1) * cellH; }
+
+      // Top Wall Departments
+      const topDepts = [
+        { name: "DAIRY", x: 1, w: 5, color: "#dbeafe" },
+        { name: "FROZEN FOODS", x: 6, w: 5, color: "#e0f2fe" },
+        { name: "BEVERAGES", x: 11, w: 4, color: "#fef3c7" },
+        { name: "MEAT", x: 15, w: 4, color: "#ffe4e6" },
+        { name: "SEAFOOD", x: 19, w: 4, color: "#ccfbf1" }
+      ];
+      topDepts.forEach(d => {
+        const sx = toScreenX(d.x), sy = toScreenY(9), sw = d.w * cellW, sh = cellH;
+        ctx.fillStyle = d.color; ctx.fillRect(sx, sy, sw, sh);
+        ctx.strokeStyle = "#cbd5e1"; ctx.strokeRect(sx, sy, sw, sh);
+        ctx.fillStyle = "#1e293b"; ctx.font = "bold 10px Inter, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(d.name, sx + sw / 2, sy + sh / 2);
+      });
+
+      // Left Wall Departments
+      const leftDepts = [
+        { name: "BAKERY", y: 6, h: 3, color: "#fef3c7" },
+        { name: "FRUITS & VEG", y: 3, h: 3, color: "#dcfce7" },
+        { name: "FLOWERS", y: 1, h: 2, color: "#fce7f3" }
+      ];
+      leftDepts.forEach(d => {
+        const sx = toScreenX(0), sy = toScreenY(d.y + d.h - 1), sw = 2 * cellW, sh = d.h * cellH;
+        ctx.fillStyle = d.color; ctx.fillRect(sx, sy, sw, sh);
+        ctx.strokeStyle = "#cbd5e1"; ctx.strokeRect(sx, sy, sw, sh);
+        ctx.fillStyle = "#1e293b"; ctx.font = "bold 9px Inter, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(d.name, sx + sw / 2, sy + sh / 2);
+      });
+
+      // Right Wall Departments
+      const rightDepts = [
+        { name: "DELI", y: 8, h: 1, color: "#ffedd5" },
+        { name: "READY TO EAT", y: 5, h: 3, color: "#fef9c3" },
+        { name: "SNACKS", y: 2, h: 3, color: "#fed7aa" }
+      ];
+      rightDepts.forEach(d => {
+        const sx = toScreenX(22), sy = toScreenY(d.y + d.h - 1), sw = 2 * cellW, sh = d.h * cellH;
+        ctx.fillStyle = d.color; ctx.fillRect(sx, sy, sw, sh);
+        ctx.strokeStyle = "#cbd5e1"; ctx.strokeRect(sx, sy, sw, sh);
+        ctx.fillStyle = "#1e293b"; ctx.font = "bold 9px Inter, sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(d.name, sx + sw / 2, sy + sh / 2);
+      });
+
+      // Render Aisle Shelves
+      shelfBlocks.forEach(a => {
+        const sx = toScreenX(a.x);
+        const sy = toScreenY(7);
+        const sw = 2 * cellW;
+        const sh = 6 * cellH;
+
+        ctx.fillStyle = "#f1f5f9";
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.strokeRect(sx, sy, sw, sh);
+
+        ctx.fillStyle = "#1e293b";
+        ctx.font = "bold 11px Inter, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(a.name, sx + sw / 2, sy + sh / 2 - 8);
+
+        ctx.fillStyle = "#64748b";
+        ctx.font = "9px Inter, sans-serif";
+        ctx.fillText(a.category, sx + sw / 2, sy + sh / 2 + 8);
+      });
+
+      // Entrance & Carts
+      const entSx = toScreenX(3), entSy = toScreenY(0);
+      ctx.fillStyle = "#2bb673"; ctx.fillRect(entSx, entSy, 5 * cellW, cellH);
+      ctx.fillStyle = "#ffffff"; ctx.font = "bold 11px Inter, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("ENTRANCE & CARTS", entSx + (5 * cellW) / 2, entSy + cellH / 2);
+
+      // Checkout Counters
+      const chkSx = toScreenX(13), chkSy = toScreenY(0);
+      ctx.fillStyle = "#e2e8f0"; ctx.fillRect(chkSx, chkSy, 9 * cellW, cellH);
+      ctx.fillStyle = "#1e293b"; ctx.font = "bold 11px Inter, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("CHECKOUT COUNTERS", chkSx + (9 * cellW) / 2, chkSy + cellH / 2);
+
+      function toScreenCenterX(gridX) { return margin + (gridX + 0.5) * cellW; }
+      function toScreenCenterY(gridY) { return margin + (GRID_HEIGHT - gridY - 0.5) * cellH; }
+
+      // Draw Path Line & Google Maps Style Pins
+      if (calculatedPath.length > 0) {
+        ctx.beginPath();
+        ctx.strokeStyle = "#2bb673";
+        ctx.lineWidth = 5;
+        ctx.lineJoin = "round";
+        ctx.lineCap = "round";
+
+        const startPt = calculatedPath[0];
+        ctx.moveTo(toScreenCenterX(startPt.x), toScreenCenterY(startPt.y));
+
+        for (let i = 1; i < calculatedPath.length; i++) {
+          const pt = calculatedPath[i];
+          ctx.lineTo(toScreenCenterX(pt.x), toScreenCenterY(pt.y));
+        }
+        ctx.stroke();
+
+        // Draw Google Maps Style Glowing Waypoint Pins
+        calculatedPath.forEach((pt, idx) => {
+          const sx = toScreenCenterX(pt.x);
+          const sy = toScreenCenterY(pt.y);
+
+          // Outer pulse ring
+          ctx.beginPath();
+          ctx.arc(sx, sy, idx === 0 || idx === calculatedPath.length - 1 ? 10 : 7, 0, Math.PI * 2);
+          ctx.fillStyle = idx === 0 ? "rgba(43, 182, 115, 0.3)" : (idx === calculatedPath.length - 1 ? "rgba(239, 68, 68, 0.3)" : "rgba(255, 152, 0, 0.3)");
+          ctx.fill();
+
+          // Inner solid pin
+          ctx.beginPath();
+          ctx.arc(sx, sy, idx === 0 || idx === calculatedPath.length - 1 ? 6 : 4, 0, Math.PI * 2);
+          ctx.fillStyle = idx === 0 ? "#2bb673" : (idx === calculatedPath.length - 1 ? "#ef4444" : "#ff9800");
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        });
+      }
+    }
+
+    // Google Maps Style Hover Detection over Aisles
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const mouseX = (e.clientX - rect.left) * scaleX;
+      const mouseY = (e.clientY - rect.top) * scaleY;
+
+      const margin = 50;
+      const usableW = canvas.width - margin * 2;
+      const usableH = canvas.height - margin * 2;
+      const cellW = usableW / GRID_WIDTH;
+      const cellH = usableH / GRID_HEIGHT;
+
+      let hoveredAisle = null;
+
+      shelfBlocks.forEach(a => {
+        const sx = margin + a.x * cellW;
+        const sy = margin + (GRID_HEIGHT - 7 - 1) * cellH;
+        const sw = 2 * cellW;
+        const sh = 6 * cellH;
+
+        if (mouseX >= sx && mouseX <= sx + sw && mouseY >= sy && mouseY <= sy + sh) {
+          hoveredAisle = a;
+        }
+      });
+
+      if (hoveredAisle) {
+        tooltipTitle.textContent = hoveredAisle.name + " (" + hoveredAisle.category + ")";
+        
+        // Filter products matching this aisle's X coordinate range from the database
+        const aisleProducts = allDatabaseProducts.filter(p => {
+          const px = p.xCoordinate !== undefined ? p.xCoordinate : p.X_cordinate;
+          return px >= hoveredAisle.gridMinX && px <= hoveredAisle.gridMaxX;
+        });
+
+        tooltipProducts.innerHTML = "";
+        if (aisleProducts.length > 0) {
+          aisleProducts.slice(0, 10).forEach(prod => {
+            const name = prod.productName !== undefined ? prod.productName : prod.Product_name;
+            const price = prod.price !== undefined ? prod.price : prod.Price;
+            const img = prod.productImage !== undefined ? prod.productImage : prod.Product_image;
+
+            const div = document.createElement("div");
+            div.className = "tooltip-product-item";
+            div.innerHTML = `
+              <img src="${img || 'https://via.placeholder.com/32'}" alt="product">
+              <div style="flex:1; overflow:hidden;">
+                <div style="font-weight:600; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${name}</div>
+                <div style="color:#64748b;">$${price ? price.toFixed(2) : '0.00'}</div>
+              </div>
+            `;
+            tooltipProducts.appendChild(div);
+          });
+        } else {
+          tooltipProducts.innerHTML = `<div style="font-size:0.8rem; color:#64748b; padding:4px;">No products indexed in this aisle.</div>`;
+        }
+
+        tooltip.style.display = "block";
+        tooltip.style.left = (e.clientX - canvasContainer.getBoundingClientRect().left + 15) + "px";
+        tooltip.style.top = (e.clientY - canvasContainer.getBoundingClientRect().top + 15) + "px";
+      } else {
+        tooltip.style.display = "none";
+      }
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      tooltip.style.display = "none";
+    });
+
+    function generateQRCode() {
+      const qrContainer = document.getElementById("qrcode");
+      qrContainer.innerHTML = "";
+      new QRCode(qrContainer, {
+        text: window.location.href,
+        width: 130,
+        height: 130,
+        colorDark: "#2d3748",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+
+    downloadBtn.addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.download = "aislewise-interactive-route.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    });
+    qrDownloadBtn.addEventListener("click", () => downloadBtn.click());
+
+    window.addEventListener("DOMContentLoaded", initMap);
+  </script>
+</body>
+</html>

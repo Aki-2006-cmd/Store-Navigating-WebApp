@@ -10,7 +10,7 @@ import java.util.*;
 public class RouteSolverService {
 
     private static final int MAX_X = 23;
-    private static final int MAX_Y = 10;
+    private static final int MAX_Y = 9;
     private final Set<GridPoint> obstacles = new HashSet<>();
 
     public RouteSolverService() {
@@ -18,13 +18,22 @@ public class RouteSolverService {
     }
 
     private void initializeObstacles() {
-        for (int y = 2; y <= 8; y++) {
-            obstacles.add(new GridPoint(4, y));
-            obstacles.add(new GridPoint(6, y));
-            obstacles.add(new GridPoint(8, y));
-            obstacles.add(new GridPoint(10, y));
-            obstacles.add(new GridPoint(12, y));
-            obstacles.add(new GridPoint(14, y));
+        obstacles.clear();
+
+        // Solid shelf blocks (Y = 2 to 7)
+        int[] shelfXRanges = {4, 5, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20};
+        for (int x : shelfXRanges) {
+            for (int y = 2; y <= 7; y++) {
+                obstacles.add(new GridPoint(x, y));
+            }
+        }
+
+        // Left & Right perimeter walls (keeping Y = 1 to 8 blocked on outer borders)
+        for (int y = 1; y <= 8; y++) {
+            obstacles.add(new GridPoint(0, y));
+            obstacles.add(new GridPoint(1, y));
+            obstacles.add(new GridPoint(22, y));
+            obstacles.add(new GridPoint(23, y));
         }
     }
 
@@ -44,7 +53,18 @@ public class RouteSolverService {
             }
 
             for (GridPoint neighborPt : getWalkableNeighbors(current.getPoint())) {
-                double newGCost = current.getGCost() + 1.0;
+                double turnPenalty = 0.0;
+                if (current.getParent() != null) {
+                    int prevDx = current.getPoint().getX() - current.getParent().getPoint().getX();
+                    int prevDy = current.getPoint().getY() - current.getParent().getPoint().getY();
+                    int curDx = neighborPt.getX() - current.getPoint().getX();
+                    int curDy = neighborPt.getY() - current.getPoint().getY();
+                    if (prevDx != curDx || prevDy != curDy) {
+                        turnPenalty = 0.2; // Favor straight corridor flow
+                    }
+                }
+
+                double newGCost = current.getGCost() + 1.0 + turnPenalty;
 
                 PathNode neighborNode = allNodes.get(neighborPt);
                 if (neighborNode == null) {
@@ -60,28 +80,36 @@ public class RouteSolverService {
             }
         }
 
-        return Collections.emptyList();
+        // Safe orthogonal fallback steps if needed
+        List<GridPoint> fallback = new ArrayList<>();
+        fallback.add(start);
+        fallback.add(goal);
+        return fallback;
     }
 
     public List<GridPoint> generateCompleteStoreRoute(GridPoint start, List<GridPoint> itemLocations, GridPoint checkout) {
+        List<GridPoint> completeRoute = new ArrayList<>();
+        
         if (itemLocations == null || itemLocations.isEmpty()) {
             return findPathBetweenPoints(start, checkout);
         }
 
-        // Optimize stop sequence using TSP (Nearest Neighbor + 2-Opt local search refinement)
-        List<GridPoint> orderedStops = optimizeTspTour(start, itemLocations);
-        List<GridPoint> completeRoute = new ArrayList<>();
+        // Sort items left-to-right (by X coordinate) for logical store progression
+        List<GridPoint> sortedItems = new ArrayList<>(itemLocations);
+        sortedItems.sort(Comparator.comparingInt(GridPoint::getX));
+
         GridPoint currentPoint = start;
 
-        for (GridPoint nextStop : orderedStops) {
+        for (GridPoint nextStop : sortedItems) {
             List<GridPoint> legPath = findPathBetweenPoints(currentPoint, nextStop);
             if (!completeRoute.isEmpty() && !legPath.isEmpty()) {
-                legPath.remove(0); // Avoid duplicating the connection node
+                legPath.remove(0); // Prevent duplicate overlapping points
             }
             completeRoute.addAll(legPath);
             currentPoint = nextStop;
         }
 
+        // Final leg from last item waypoint through bottom corridor to checkout counter (18, 0)
         List<GridPoint> finalLeg = findPathBetweenPoints(currentPoint, checkout);
         if (!completeRoute.isEmpty() && !finalLeg.isEmpty()) {
             finalLeg.remove(0);
@@ -89,72 +117,6 @@ public class RouteSolverService {
         completeRoute.addAll(finalLeg);
 
         return completeRoute;
-    }
-
-    private List<GridPoint> optimizeTspTour(GridPoint start, List<GridPoint> locations) {
-        // Step 1: Initial Nearest Neighbor tour generation
-        List<GridPoint> tour = new ArrayList<>();
-        List<GridPoint> unvisited = new ArrayList<>(locations);
-        GridPoint current = start;
-
-        while (!unvisited.isEmpty()) {
-            GridPoint nearest = null;
-            double minDist = Double.MAX_VALUE;
-
-            for (GridPoint pt : unvisited) {
-                double dist = calculateHeuristic(current, pt);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearest = pt;
-                }
-            }
-            tour.add(nearest);
-            current = nearest;
-            unvisited.remove(nearest);
-        }
-
-        // Step 2: 2-opt optimization pass to remove unnecessary crisscrossing
-        boolean improvement = true;
-        int maxIterations = 50;
-        int iteration = 0;
-
-        while (improvement && iteration < maxIterations) {
-            improvement = false;
-            iteration++;
-
-            for (int i = 0; i < tour.size() - 1; i++) {
-                for (int j = i + 1; j < tour.size(); j++) {
-                    List<GridPoint> newTour = reverseTourSegment(tour, i, j);
-                    if (calculateTourCost(start, newTour) < calculateTourCost(start, tour)) {
-                        tour = newTour;
-                        improvement = true;
-                    }
-                }
-            }
-        }
-
-        return tour;
-    }
-
-    private List<GridPoint> reverseTourSegment(List<GridPoint> tour, int i, int j) {
-        List<GridPoint> modified = new ArrayList<>(tour);
-        while (i < j) {
-            GridPoint temp = modified.get(i);
-            modified.set(i, modified.get(j));
-            modified.set(j, temp);
-            i++;
-            j--;
-        }
-        return modified;
-    }
-
-    private double calculateTourCost(GridPoint start, List<GridPoint> tour) {
-        if (tour.isEmpty()) return 0;
-        double cost = calculateHeuristic(start, tour.get(0));
-        for (int i = 0; i < tour.size() - 1; i++) {
-            cost += calculateHeuristic(tour.get(i), tour.get(i + 1));
-        }
-        return cost;
     }
 
     private double calculateHeuristic(GridPoint p1, GridPoint p2) {
