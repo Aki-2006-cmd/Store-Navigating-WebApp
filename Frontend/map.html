@@ -208,14 +208,6 @@
       border: 1px solid var(--border);
     }
 
-    .tooltip-product-item img {
-      width: 32px;
-      height: 32px;
-      object-fit: cover;
-      border-radius: 4px;
-      background: #e2e8f0;
-    }
-
     .map-sidebar {
       width: 280px;
       display: flex;
@@ -394,13 +386,11 @@
         if (!res.ok) throw new Error("Backend response error");
         const routeResponse = await res.json();
 
-        // Handle the new RouteResponsedto format: { path: [...], pins: [...] }
         if (routeResponse && Array.isArray(routeResponse.path) && routeResponse.path.length > 0) {
           calculatedPath = routeResponse.path;
           statusText.textContent = "Precise route loaded successfully!";
           routeInfo.textContent = calculatedPath.length + " Waypoints";
 
-          // Map the raw shelf pins returned directly from the backend DTO
           if (Array.isArray(routeResponse.pins)) {
             cartProductItems = routeResponse.pins.map(pin => {
               return {
@@ -659,18 +649,73 @@
           aisleProducts.slice(0, 10).forEach(prod => {
             const name = prod.productName !== undefined ? prod.productName : prod.Product_name;
             const price = prod.price !== undefined ? prod.price : prod.Price;
-            const img = prod.productImage !== undefined ? prod.productImage : prod.Product_image;
+            const rawImg = prod.productImage !== undefined ? prod.productImage : prod.Product_image;
 
-            const div = document.createElement("div");
-            div.className = "tooltip-product-item";
-            div.innerHTML = `
-              <img src="${img || 'https://via.placeholder.com/32'}" alt="product">
-              <div style="flex:1; overflow:hidden;">
-                <div style="font-weight:600; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;">${name}</div>
-                <div style="color:#64748b;">$${price ? price.toFixed(2) : '0.00'}</div>
-              </div>
-            `;
-            tooltipProducts.appendChild(div);
+            // Use absolute URL or relative path resolved safely using current window origin
+            let imgSrc = null;
+            if (rawImg && typeof rawImg === "string" && rawImg.trim() !== "" && rawImg.toLowerCase() !== "null") {
+              if (rawImg.startsWith("http")) {
+                imgSrc = rawImg;
+              } else {
+                const cleanPath = rawImg.startsWith("/") ? rawImg : "/" + rawImg;
+                // Uses window.location.origin to match whatever host/port the frontend is running on
+                imgSrc = window.location.origin + cleanPath;
+              }
+            }
+
+            const itemDiv = document.createElement("div");
+            itemDiv.className = "tooltip-product-item";
+
+            const imgContainer = document.createElement("div");
+            imgContainer.style.width = "32px";
+            imgContainer.style.height = "32px";
+            imgContainer.style.flexShrink = "0";
+
+            if (imgSrc) {
+              const imgEl = document.createElement("img");
+              imgEl.src = imgSrc;
+              imgEl.alt = "";
+              imgEl.style.width = "32px";
+              imgEl.style.height = "32px";
+              imgEl.style.objectFit = "cover";
+              imgEl.style.borderRadius = "4px";
+              imgEl.style.background = "#e2e8f0";
+              imgEl.onerror = function() {
+                // Fallback to Unsplash placeholder if local database image fails to resolve or load
+                this.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?w=64&q=80";
+              };
+              imgContainer.appendChild(imgEl);
+            } else {
+              const fallbackImg = document.createElement("img");
+              fallbackImg.src = "https://images.unsplash.com/photo-1542838132-92c53300491e?w=64&q=80";
+              fallbackImg.style.width = "32px";
+              fallbackImg.style.height = "32px";
+              fallbackImg.style.objectFit = "cover";
+              fallbackImg.style.borderRadius = "4px";
+              imgContainer.appendChild(fallbackImg);
+            }
+
+            const infoDiv = document.createElement("div");
+            infoDiv.style.flex = "1";
+            infoDiv.style.overflow = "hidden";
+
+            const nameDiv = document.createElement("div");
+            nameDiv.style.fontWeight = "600";
+            nameDiv.style.whiteSpace = "nowrap";
+            nameDiv.style.textOverflow = "ellipsis";
+            nameDiv.style.overflow = "hidden";
+            nameDiv.textContent = name;
+
+            const priceDiv = document.createElement("div");
+            priceDiv.style.color = "#64748b";
+            priceDiv.textContent = `Rs. ${price ? price.toFixed(2) : '0.00'}`;
+
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(priceDiv);
+
+            itemDiv.appendChild(imgContainer);
+            itemDiv.appendChild(infoDiv);
+            tooltipProducts.appendChild(itemDiv);
           });
         } else {
           tooltipProducts.innerHTML = `<div style="font-size:0.8rem; color:#64748b; padding:4px;">No products indexed in this aisle.</div>`;
