@@ -95,9 +95,10 @@ const IMAGE_EXT = /\.(png|jpe?g|webp|svg|gif)$/i;
 function safeImageURL(value) {
   const raw = String(value ?? "").trim();
   if (!raw || raw.length > 500 || !IMAGE_EXT.test(raw.split(/[?#]/)[0])) return null;
+  const normalized = raw.startsWith("http") || raw.startsWith("/") ? raw : "/" + raw;
   try {
-    const url = new URL(raw, document.baseURI);
-    return (url.protocol === "https:" || url.protocol === window.location.protocol) ? url.href : null;
+    const url = new URL(normalized, window.location.origin);
+    return (url.protocol === "https:" || url.protocol === "http:") ? url.href : null;
   } catch {
     return null;
   }
@@ -236,7 +237,6 @@ function initNavbar() {
 const CATEGORY_TINTS = ["#fdf1e7", "#e9f0e4", "#fbe9e9", "#eceefc", "#fbf5d9"];
 
 function categoryCard(c, i) {
-  // Normalize category name to match section ID targets (e.g., "Vegetables" -> "#cat-vegetables")
   const catKey = (c.name || "").toLowerCase().trim().replace(/\s+/g, '-');
 
   const card = el("a", {
@@ -310,7 +310,6 @@ async function loadProducts(params = {}) {
     
     list.forEach(p => productCache.set(p.id, p));
 
-    // Group products by matching keys
     const groups = {};
     categoryKeys.forEach(k => groups[k] = []);
 
@@ -320,7 +319,6 @@ async function loadProducts(params = {}) {
       groups[matchedKey].push(p);
     });
 
-    // Populate each corresponding section grid
     categoryKeys.forEach(key => {
       const grid = document.getElementById(`productGrid-${key}`);
       const section = grid ? grid.closest(".products-section") : null;
@@ -349,7 +347,6 @@ async function loadProducts(params = {}) {
 }
 
 function initProducts() {
-  // Listen for favorite clicks within the products container
   document.getElementById("products").addEventListener("click", e => {
     const fav = e.target.closest(".fav");
     if (fav) fav.setAttribute("aria-pressed", String(fav.getAttribute("aria-pressed") !== "true"));
@@ -471,10 +468,8 @@ function initCart() {
   document.getElementById("cartBtn").addEventListener("click", () =>
     setCartOpen(!document.getElementById("cartPanel").classList.contains("open")));
 
-  // Clear cart button listener
   document.getElementById("clearCartBtn").addEventListener("click", clearCart);
 
-  // Delegate cart clicks across all product category grids inside #products
   document.getElementById("products").addEventListener("click", e => {
     const add = e.target.closest(".add-cart");
     if (add) addToCart(add.getAttribute("data-id"));
@@ -490,7 +485,6 @@ function initCart() {
   renderCart();
 }
 
-// POST /route with list of product IDs (Long)
 async function fetchStoreRoute(productIds) {
   const res = await fetch("http://localhost:8080/api/products/route", {
     method: "POST",
