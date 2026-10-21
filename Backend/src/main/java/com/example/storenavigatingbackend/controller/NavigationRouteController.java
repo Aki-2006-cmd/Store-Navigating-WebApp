@@ -2,6 +2,7 @@ package com.example.storenavigatingbackend.controller;
 
 import com.example.storenavigatingbackend.model.GridPoint;
 import com.example.storenavigatingbackend.model.Product;
+import com.example.storenavigatingbackend.model.RouteResponsedto;
 import com.example.storenavigatingbackend.service.ProductCatalogService;
 import com.example.storenavigatingbackend.service.StoreNavigationService;
 import org.springframework.http.HttpStatus;
@@ -37,11 +38,11 @@ public class NavigationRouteController {
 
     // "Given a grocery list, generate the shortest-time route" — full cart route
     @PostMapping("/route")
-    public ResponseEntity<List<GridPoint>> generateShoppingRoute(@RequestBody List<Long> productIds) {
+    public ResponseEntity<RouteResponsedto> generateShoppingRoute(@RequestBody List<Long> productIds) {
         if (productIds == null || productIds.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        List<GridPoint> route = storeNavigationService.calculateCartNavigationRoute(productIds);
-        return ResponseEntity.ok(route);
+        RouteResponsedto routeResponse = storeNavigationService.calculateCartNavigationRoute(productIds);
+        return ResponseEntity.ok(routeResponse);
     }
-}
+}   

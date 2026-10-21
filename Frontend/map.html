@@ -377,6 +377,7 @@
         calculatedPath = [
           {x:3, y:1}, {x:3, y:8}, {x:6, y:8}, {x:6, y:1}, {x:18, y:1}
         ];
+        cartProductItems = [];
         renderMap();
         generateQRCode();
         return;
@@ -391,34 +392,31 @@
         });
 
         if (!res.ok) throw new Error("Backend response error");
-        const pathData = await res.json();
+        const routeResponse = await res.json();
 
-        if (Array.isArray(pathData) && pathData.length > 0) {
-          calculatedPath = pathData;
+        // Handle the new RouteResponsedto format: { path: [...], pins: [...] }
+        if (routeResponse && Array.isArray(routeResponse.path) && routeResponse.path.length > 0) {
+          calculatedPath = routeResponse.path;
           statusText.textContent = "Precise route loaded successfully!";
-          routeInfo.textContent = pathData.length + " Waypoints";
+          routeInfo.textContent = calculatedPath.length + " Waypoints";
 
-          // Map each cart product directly to distinct sequential waypoints along the route path
-          cartProductItems = productIds.map((id, index) => {
-            const prod = allDatabaseProducts.find(p => String(p.id ?? p.ID) === String(id));
-            if (prod) {
-              const name = prod.productName !== undefined ? prod.productName : prod.Product_name;
-              
-              // Pick a distinct waypoint index for each cart item along the route (avoiding start/end indices 0 and last)
-              const stepSize = Math.max(1, Math.floor((calculatedPath.length - 2) / (productIds.length + 1)));
-              const waypointIndex = Math.min(calculatedPath.length - 2, (index + 1) * stepSize);
-              const pathPoint = calculatedPath[waypointIndex] || calculatedPath[1];
-
-              return { x: pathPoint.x, y: pathPoint.y, name: name };
-            }
-            return null;
-          }).filter(Boolean);
+          // Map the raw shelf pins returned directly from the backend DTO
+          if (Array.isArray(routeResponse.pins)) {
+            cartProductItems = routeResponse.pins.map(pin => {
+              return {
+                x: pin.x,
+                y: pin.y,
+                name: pin.name
+              };
+            });
+          }
         }
       } catch (err) {
         console.warn("Using default path:", err);
         calculatedPath = [
           {x:3, y:1}, {x:3, y:8}, {x:6, y:8}, {x:6, y:1}, {x:18, y:1}
         ];
+        cartProductItems = [];
       }
 
       renderMap();
@@ -562,7 +560,7 @@
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // 2. Draw Google Maps Style Red Teardrop Pins & Product Name Labels directly on the Route Path Stops
+        // 2. Draw Google Maps Style Red Teardrop Pins & Product Name Labels using raw database shelf coordinates
         cartProductItems.forEach(item => {
           const pinX = toScreenCenterX(item.x);
           const pinY = toScreenCenterY(item.y);
@@ -589,7 +587,7 @@
 
           ctx.restore();
 
-          // Render Product Name Label directly beside the pin on the path
+          // Render Product Name Label directly beside the pin on its shelf location
           ctx.save();
           ctx.font = "bold 10px Inter, sans-serif";
           ctx.textAlign = "left";

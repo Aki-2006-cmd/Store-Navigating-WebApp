@@ -2,6 +2,7 @@ package com.example.storenavigatingbackend.service;
 
 import com.example.storenavigatingbackend.model.GridPoint;
 import com.example.storenavigatingbackend.model.Product;
+import com.example.storenavigatingbackend.model.RouteResponsedto;
 import com.example.storenavigatingbackend.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 
@@ -57,12 +58,22 @@ public class StoreNavigationService {
         return 18;                   // Aisle 6
     }
 
-    public List<GridPoint> calculateCartNavigationRoute(List<Long> productIds) {
+    public RouteResponsedto calculateCartNavigationRoute(List<Long> productIds) {
         List<Product> products = productRepository.findAllById(productIds);
 
         List<GridPoint> itemWaypoints = new ArrayList<>();
+        List<RouteResponsedto.ProductPin> productPins = new ArrayList<>();
+
         for (Product product : products) {
+            // 1. Snapped walkway coordinate used strictly for Dijkstra pathfinding
             itemWaypoints.add(mapProductToCoordinate(product));
+
+            // 2. Raw database shelf coordinate used strictly for UI rendering/pins
+            int rawX = product.getXCoordinate();
+            int rawY = product.getYCoordinate();
+            String name = product.getProductName();
+
+            productPins.add(new RouteResponsedto.ProductPin(product.getId(), name, rawX, rawY));
         }
 
         // Carts Starting Point at (3, 0)
@@ -70,6 +81,8 @@ public class StoreNavigationService {
         // Checkout Counters Ending Point at (18, 0)
         GridPoint checkoutPoint = new GridPoint(18, 0);
 
-        return routeSolverService.generateCompleteStoreRoute(startPoint, itemWaypoints, checkoutPoint);
+        List<GridPoint> fullRoute = routeSolverService.generateCompleteStoreRoute(startPoint, itemWaypoints, checkoutPoint);
+
+        return new RouteResponsedto(fullRoute, productPins);
     }
 }
