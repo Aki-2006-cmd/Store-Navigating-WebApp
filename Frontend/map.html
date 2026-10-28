@@ -241,6 +241,9 @@
       background: white;
       border-radius: 6px;
       border: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
     .status-banner {
@@ -807,25 +810,58 @@
       tooltip.style.opacity = "0";
     });
 
-    // UPDATED QR GENERATOR: Encodes a lightweight summary text or shareable URL payload 
-    // so the QR code generates instantly without character overflow errors.
-    function generateQRCode() {
+    // CLOUD UPLOAD QR GENERATOR: Uploads canvas map as an image to a public host API 
+    // so anyone scanning the QR code gets the actual map image instantly on their phone.
+    // ROCK-SOLID MOBILE QR GENERATOR
+    async function generateQRCode() {
       const qrContainer = document.getElementById("qrcode");
-      qrContainer.innerHTML = "";
+      qrContainer.innerHTML = `<span style="font-size:0.75rem; color:#64748b; padding:15px; text-align:center;">Uploading map to cloud...</span>`;
 
-      // Safe URL payload pointing to the current app page or summary
-      const qrData = window.location.href;
+      try {
+        // 1. Get canvas data URL
+        const dataUrl = canvas.toDataURL("image/png");
 
-      new QRCode(qrContainer, {
-        text: qrData,
-        width: 130,
-        height: 130,
-        colorDark: "#2d3748",
-        colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.M
-      });
+        // 2. Send image to your Spring Boot backend proxy
+        const response = await fetch("http://localhost:8080/api/navigation/upload-map", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: dataUrl })
+        });
+
+        if (!response.ok) throw new Error("Backend proxy upload failed");
+
+        const publicUrl = await response.text();
+
+        // 3. Generate the QR code using the permanent cloud URL
+        qrContainer.innerHTML = "";
+        new QRCode(qrContainer, {
+          text: publicUrl.trim(),
+          width: 130,
+          height: 130,
+          colorDark: "#2d3748",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+
+        statusText.textContent = "Cloud QR Ready! Scan with any phone to view and download the map.";
+
+      } catch (err) {
+        console.error("Cloud upload error:", err);
+        
+        // Fallback
+        qrContainer.innerHTML = "";
+        new QRCode(qrContainer, {
+          text: window.location.href,
+          width: 130,
+          height: 130,
+          colorDark: "#2d3748",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+
+        statusText.textContent = "Cloud upload failed; using local page fallback.";
+      }
     }
-
     downloadBtn.addEventListener("click", () => {
       const link = document.createElement("a");
       link.download = "aislewise-interactive-route.png";
