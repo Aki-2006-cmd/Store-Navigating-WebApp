@@ -177,7 +177,8 @@
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
       pointer-events: none;
       z-index: 100;
-      transition: transform 0.1s ease;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
     }
 
     #mapTooltip h3 {
@@ -334,6 +335,8 @@
     let calculatedPath = [];
     let allDatabaseProducts = [];
     let cartProductItems = [];
+    let pulseRadius = 0;
+    let travelProgress = 0;
 
     const shelfBlocks = [
       { name: "Aisle 1", category: "Dairy & Milk", x: 4, gridMinX: 4, gridMaxX: 5 },
@@ -347,6 +350,7 @@
     async function initMap() {
       await fetchAllProducts();
       await loadRouteData();
+      requestAnimationFrame(startAnimationLoop);
     }
 
     async function fetchAllProducts() {
@@ -413,6 +417,23 @@
       generateQRCode();
     }
 
+    function drawTravelingArrow(ctx, fromX, fromY, toX, toY, radius = 13) {
+      const angle = Math.atan2(toY - fromY, toX - fromX);
+      ctx.save();
+      ctx.translate(toX, toY);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(-radius * 1.8, radius * 1.1);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(-radius * 1.8, -radius * 1.1);
+      ctx.fillStyle = "#0d5c34";
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      ctx.restore();
+    }
+
     function renderMap() {
       const w = canvas.width;
       const h = canvas.height;
@@ -447,7 +468,7 @@
         ctx.fillStyle = d.color; ctx.fillRect(sx, sy, sw, sh);
         ctx.strokeStyle = "#cbd5e1"; ctx.strokeRect(sx, sy, sw, sh);
         ctx.fillStyle = "#1e293b"; 
-        ctx.font = "bold 15px Inter, sans-serif"; // Increased font size
+        ctx.font = "bold 15px Inter, sans-serif";
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText(d.name, sx + sw / 2, sy + sh / 2);
       });
@@ -463,7 +484,7 @@
         ctx.fillStyle = d.color; ctx.fillRect(sx, sy, sw, sh);
         ctx.strokeStyle = "#cbd5e1"; ctx.strokeRect(sx, sy, sw, sh);
         ctx.fillStyle = "#1e293b"; 
-        ctx.font = "bold 14px Inter, sans-serif"; // Increased font size
+        ctx.font = "bold 14px Inter, sans-serif";
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText(d.name, sx + sw / 2, sy + sh / 2);
       });
@@ -479,7 +500,7 @@
         ctx.fillStyle = d.color; ctx.fillRect(sx, sy, sw, sh);
         ctx.strokeStyle = "#cbd5e1"; ctx.strokeRect(sx, sy, sw, sh);
         ctx.fillStyle = "#1e293b"; 
-        ctx.font = "bold 14px Inter, sans-serif"; // Increased font size
+        ctx.font = "bold 14px Inter, sans-serif";
         ctx.textAlign = "center"; ctx.textBaseline = "middle";
         ctx.fillText(d.name, sx + sw / 2, sy + sh / 2);
       });
@@ -497,13 +518,13 @@
         ctx.strokeRect(sx, sy, sw, sh);
 
         ctx.fillStyle = "#0f172a";
-        ctx.font = "bold 16px Inter, sans-serif"; // Increased aisle title font size
+        ctx.font = "bold 16px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(a.name, sx + sw / 2, sy + sh / 2 - 12);
 
         ctx.fillStyle = "#475569";
-        ctx.font = "bold 13px Inter, sans-serif"; // Increased category font size
+        ctx.font = "bold 13px Inter, sans-serif";
         ctx.fillText(a.category, sx + sw / 2, sy + sh / 2 + 12);
       });
 
@@ -511,7 +532,7 @@
       const entSx = toScreenX(3), entSy = toScreenY(0);
       ctx.fillStyle = "#2bb673"; ctx.fillRect(entSx, entSy, 5 * cellW, cellH);
       ctx.fillStyle = "#ffffff"; 
-      ctx.font = "bold 16px Inter, sans-serif"; // Increased font size
+      ctx.font = "bold 16px Inter, sans-serif";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("ENTRANCE & CARTS", entSx + (5 * cellW) / 2, entSy + cellH / 2);
 
@@ -519,14 +540,14 @@
       const chkSx = toScreenX(13), chkSy = toScreenY(0);
       ctx.fillStyle = "#e2e8f0"; ctx.fillRect(chkSx, chkSy, 9 * cellW, cellH);
       ctx.fillStyle = "#1e293b"; 
-      ctx.font = "bold 16px Inter, sans-serif"; // Increased font size
+      ctx.font = "bold 16px Inter, sans-serif";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText("CHECKOUT COUNTERS", chkSx + (9 * cellW) / 2, chkSy + cellH / 2);
 
       function toScreenCenterX(gridX) { return margin + (gridX + 0.5) * cellW; }
       function toScreenCenterY(gridY) { return margin + (GRID_HEIGHT - gridY - 0.5) * cellH; }
 
-      // Draw Path Line
+      // Draw Path Line and Traveling Arrow from Entrance to Checkout
       if (calculatedPath.length > 0) {
         ctx.beginPath();
         ctx.strokeStyle = "#2bb673";
@@ -535,18 +556,54 @@
         ctx.lineCap = "round";
 
         const startPt = calculatedPath[0];
-        ctx.moveTo(toScreenCenterX(startPt.x), toScreenCenterY(startPt.y));
+        let currentScreenX = toScreenCenterX(startPt.x);
+        let currentScreenY = toScreenCenterY(startPt.y);
+        ctx.moveTo(currentScreenX, currentScreenY);
+
+        const segments = [];
+        let totalPathLength = 0;
 
         for (let i = 1; i < calculatedPath.length; i++) {
           const pt = calculatedPath[i];
-          ctx.lineTo(toScreenCenterX(pt.x), toScreenCenterY(pt.y));
+          const nextX = toScreenCenterX(pt.x);
+          const nextY = toScreenCenterY(pt.y);
+          ctx.lineTo(nextX, nextY);
+
+          const dx = nextX - currentScreenX;
+          const dy = nextY - currentScreenY;
+          const dist = Math.hypot(dx, dy);
+          segments.push({ fromX: currentScreenX, fromY: currentScreenY, toX: nextX, toY: nextY, dist });
+          totalPathLength += dist;
+
+          currentScreenX = nextX;
+          currentScreenY = nextY;
         }
         ctx.stroke();
 
-        // 1. Draw Start Pin (Green circle at carts)
+        if (totalPathLength > 0) {
+          const targetDistance = travelProgress * totalPathLength;
+          let accumulated = 0;
+
+          for (const seg of segments) {
+            if (accumulated + seg.dist >= targetDistance) {
+              drawTravelingArrow(ctx, seg.fromX, seg.fromY, seg.toX, seg.toY, 12);
+              break;
+            }
+            accumulated += seg.dist;
+          }
+        }
+
+        // 1. Draw Animated Pulsing Start Pin
         const start = calculatedPath[0];
         const startX = toScreenCenterX(start.x);
         const startY = toScreenCenterY(start.y);
+
+        ctx.beginPath();
+        ctx.arc(startX, startY, 10 + (pulseRadius % 15), 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(43, 182, 115, ${1 - (pulseRadius % 15) / 15})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
         ctx.beginPath();
         ctx.arc(startX, startY, 10, 0, Math.PI * 2);
         ctx.fillStyle = "#2bb673";
@@ -555,7 +612,7 @@
         ctx.lineWidth = 3;
         ctx.stroke();
 
-        // 2. Draw Google Maps Style Red Teardrop Pins & Larger Product Name Labels
+        // 2. Draw Google Style Pins & Product Labels
         cartProductItems.forEach(item => {
           const pinX = toScreenCenterX(item.x);
           const pinY = toScreenCenterY(item.y);
@@ -563,7 +620,6 @@
           ctx.save();
           ctx.translate(pinX, pinY);
 
-          // Teardrop Pin Body pointing down to (0,0)
           ctx.beginPath();
           ctx.moveTo(0, 0);
           ctx.bezierCurveTo(-12, -12, -12, -30, 0, -30);
@@ -574,7 +630,6 @@
           ctx.strokeStyle = "#ffffff";
           ctx.stroke();
 
-          // Inner Dot of Pin
           ctx.beginPath();
           ctx.arc(0, -18, 4, 0, Math.PI * 2);
           ctx.fillStyle = "#ffffff";
@@ -582,9 +637,8 @@
 
           ctx.restore();
 
-          // Render Product Name Label with Larger Font Size
           ctx.save();
-          ctx.font = "bold 14px Inter, sans-serif"; // Increased pin label font size
+          ctx.font = "bold 14px Inter, sans-serif";
           ctx.textAlign = "left";
           ctx.textBaseline = "middle";
           
@@ -621,7 +675,15 @@
       }
     }
 
-    // Google Maps Style Hover Detection over Aisles
+    function startAnimationLoop() {
+      pulseRadius += 0.5;
+      travelProgress += 0.003;
+      if (travelProgress > 1) travelProgress = 0;
+
+      renderMap();
+      requestAnimationFrame(startAnimationLoop);
+    }
+
     canvas.addEventListener("mousemove", (e) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
@@ -731,27 +793,36 @@
         }
 
         tooltip.style.display = "block";
+        tooltip.style.opacity = "1";
         tooltip.style.left = (e.clientX - canvasContainer.getBoundingClientRect().left + 15) + "px";
         tooltip.style.top = (e.clientY - canvasContainer.getBoundingClientRect().top + 15) + "px";
       } else {
         tooltip.style.display = "none";
+        tooltip.style.opacity = "0";
       }
     });
 
     canvas.addEventListener("mouseleave", () => {
       tooltip.style.display = "none";
+      tooltip.style.opacity = "0";
     });
 
+    // UPDATED QR GENERATOR: Encodes a lightweight summary text or shareable URL payload 
+    // so the QR code generates instantly without character overflow errors.
     function generateQRCode() {
       const qrContainer = document.getElementById("qrcode");
       qrContainer.innerHTML = "";
+
+      // Safe URL payload pointing to the current app page or summary
+      const qrData = window.location.href;
+
       new QRCode(qrContainer, {
-        text: window.location.href,
+        text: qrData,
         width: 130,
         height: 130,
         colorDark: "#2d3748",
         colorLight: "#ffffff",
-        correctLevel: QRCode.CorrectLevel.H
+        correctLevel: QRCode.CorrectLevel.M
       });
     }
 
